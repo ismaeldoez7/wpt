@@ -2,11 +2,34 @@
  * Creates a Payment Method Identifier (PMI) URL pointing to payment-method-identifier.py.
  *
  * @param {string} testId - The unique test run token.
+ * @param {Object} [options] - URL configuration options.
+ * @param {string|string[]} [options.link] - Custom Link header(s).
  * @returns {string} Fully qualified PMI URL.
  */
-function createPaymentMethodIdentifierUrl(testId) {
+function createPaymentMethodIdentifierUrl(testId, options = {}) {
   const url = new URL(`https://${location.host}/payment-method-manifest/resources/payment-method-identifier.py`);
   url.searchParams.set('id', testId);
+  if (options.link !== undefined) {
+    const links = Array.isArray(options.link) ? options.link : [options.link];
+    links.forEach(l => url.searchParams.append('link', l));
+  }
+  return url.href;
+}
+
+/**
+ * Creates a Payment Method Manifest URL pointing to payment-method-manifest.py.
+ *
+ * @param {string} testId - The unique test run token.
+ * @param {Object} [options] - URL configuration options.
+ * @param {number} [options.status] - Response HTTP status code.
+ * @returns {string} Fully qualified manifest URL.
+ */
+function createPaymentMethodManifestUrl(testId, options = {}) {
+  const url = new URL(`https://${location.host}/payment-method-manifest/resources/payment-method-manifest.py`);
+  url.searchParams.set('id', testId);
+  if (options.status !== undefined) {
+    url.searchParams.set('status', options.status);
+  }
   return url.href;
 }
 
