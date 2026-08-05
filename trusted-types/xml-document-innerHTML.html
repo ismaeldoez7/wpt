@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <script src="/resources/testharness.js"></script>
+  <script src="/resources/testharnessreport.js"></script>
+  <meta http-equiv="Content-Security-Policy" content="require-trusted-types-for 'script';">
+</head>
+<body>
+<script>
+  // Since we cannot recreate/redefine the "default" policy in a single global context
+  // easily for multiple independent tests if they run in the same document,
+  // we can use a helper or run them in iframes, or just test one configuration per file.
+  // Wait, let's use an iframe or simply document.implementation.createDocument,
+  // but the default policy is global for the window.
+  // To test different default policies, we can use iframes.
+  
+  function run_test_in_iframe(policyScript, testFunc) {
+    return new Promise((resolve) => {
+      const iframe = document.createElement('iframe');
+      iframe.srcdoc = `
+        <!DOCTYPE html>
+        <script src="/resources/testharness.js"></script>
+        <script src="/resources/testharnessreport.js"></script>
+        <meta http-equiv="Content-Security-Policy" content="require-trusted-types-for 'script';">
+        <script>
+          ${policyScript}
+          window.runTest = ${testFunc.toString()};
+        </script>
+      `;
+      iframe.onload = () => {
+        iframe.contentWindow.runTest(iframe.contentDocument);
+        resolve();
+      };
+      document.body.appendChild(iframe);
+    });
+  }
+
+  promise_test(async () => {
+    const policyScript = `
+      trustedTypes.createPolicy("default", {
+        createHTML: (x) => x,
+        createParserOptions: (options) => {
+          return {
+            sanitizer: { removeElements: ["span"] }
+          };
+        }
+      });
+    `;
+    await run_test_in_iframe(policyScript, (iframeDoc) => {
+      const xmlDoc = iframeDoc.implementation.createDocument(null, 'root', null);
+      const element = xmlDoc.documentElement;
+      // Using innerHTML on XML document with a default policy that returns a sanitizer
+      // should throw TypeError.
+      try {
+        element.innerHTML = "<child>test</child>";
+        window.parent.assert_unreached("Should have thrown TypeError because sanitization cannot be applied to XML document innerHTML.");
+      } catch (e) {
+        window.parent.assert_true(e instanceof TypeError, "Expected TypeError, got: " + e);
+      }
+    });
+  }, "innerHTML on XML document throws TypeError if default policy specifies a sanitizer");
+
+  promise_test(async () => {
+    const policyScript = `
+      trustedTypes.createPolicy("default", {
+        createHTML: (x) => "parsed: " + x,
+        createParserOptions: (options) => {
+          return {
+            runScripts: false
+          };
+        }
+      });
+    `;
+    await run_test_in_iframe(policyScript, (iframeDoc) => {
+      const xmlDoc = iframeDoc.implementation.createDocument(null, 'root', null);
+      const element = xmlDoc.documentElement;
+      // Using innerHTML on XML document with default policy that does NOT return a sanitizer
+      // should succeed.
+      try {
+        element.innerHTML = "<child>test</child>";
+        window.parent.assert_equals(element.firstChild.localName, "child");
+      } catch (e) {
+        window.parent.assert_unreached("Should not have thrown, got error: " + e);
+      }
+    });
+  }, "innerHTML on XML document succeeds if default policy does not specify a sanitizer");
+
+  promise_test(async () => {
+    const policyScript = `
+      trustedTypes.createPolicy("default", {
+        createHTML: (x) => x
+        // No createParserOptions
+      });
+    `;
+    await run_test_in_iframe(policyScript, (iframeDoc) => {
+      const xmlDoc = iframeDoc.implementation.createDocument(null, 'root', null);
+      const element = xmlDoc.documentElement;
+      // Using innerHTML on XML document with default policy that lacks createParserOptions
+      // should fallback to createHTML and succeed (since throwIfMissing is false for non-stream sinks).
+      try {
+        element.innerHTML = "<child>test</child>";
+        window.parent.assert_equals(element.firstChild.localName, "child");
+      } catch (e) {
+        window.parent.assert_unreached("Should not have thrown, got error: " + e);
+      }
+    });
+  }, "innerHTML on XML document falls back to createHTML and succeeds if createParserOptions is missing");
+
+</script>
+</body>
+</html>
