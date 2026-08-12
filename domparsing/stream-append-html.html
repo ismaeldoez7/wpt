@@ -232,6 +232,7 @@
     await writer.close();
     assert_equals(shadow.querySelector("script"), null);
   }, "streamAppendHTML on ShadowRoot uses safe sanitizer");
+
   promise_test(async (t) => {
     const element = document.createElement("div");
     document.body.append(element);
