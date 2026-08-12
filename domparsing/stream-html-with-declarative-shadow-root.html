@@ -48,7 +48,7 @@
             case "remove-shadow-root":
               assert_equals(parent.querySelector("span").shadowRoot, null);
               break;
-            case "remove-specific":
+            case "remove-internal":
               assert_not_equals(parent.querySelector("span").shadowRoot, null);
               assert_false(
                 parent
